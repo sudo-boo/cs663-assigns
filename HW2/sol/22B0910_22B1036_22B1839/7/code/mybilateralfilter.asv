@@ -1,0 +1,46 @@
+function output = mybilateralfilter(image, sigma_r, sigma_s)
+
+    % Convert the image to double for precision
+    image = double(image);
+
+    % Get the dimensions of the image
+    [rows, cols] = size(image);
+    
+    % Define the size of the Gaussian kernel
+    % Assume a reasonable size based on sigma_s
+    kernelR = ceil(3 * sigma_s);
+    
+    % Create the spatial Gaussian kernel
+    [X, Y] = meshgrid(-kernelR:kernelR, -kernelR:kernelR);
+    spatialKernel = exp(-(X.^2 + Y.^2) / (2 * sigma_s^2));
+
+    % Initialize the output image
+    output = zeros(rows, cols);
+
+    % Apply the bilateral filter
+    for i = 1:rows
+        for j = 1:cols
+
+            % Define the local region
+            iMin = max(i - kernelR, 1);
+            jMin = max(j - kernelR, 1);
+            iMax = min(i + kernelR, rows);
+            jMax = min(j + kernelR, cols);
+            
+            localRegion = image(iMin:iMax, jMin:jMax);
+
+            % Compute the intensity Gaussian kernel
+            intensityRangeKernel = exp((-(localRegion - image(i, j)) .^ 2) / (2 * sigma_r^2));
+
+            % Combine the spatial and intensity range kernels
+            subSpacial
+            combinedKernel = spatialKernel((iMin:iMax) - i + kernelR + 1, (jMin:jMax) - j + kernelR + 1) .* intensityRangeKernel;
+
+            % Normalize the combined kernel
+            combinedKernel = combinedKernel / sum(combinedKernel(:));
+            output(i, j) = sum(sum(combinedKernel .* localRegion));
+        end
+    end
+    % since our image intensity values range from 0 to 255
+    output = uint8(output);
+end
