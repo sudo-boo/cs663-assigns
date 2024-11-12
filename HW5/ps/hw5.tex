@@ -1,0 +1,63 @@
+\title{Assignment 5: CS 663}
+\author{}
+\date{Due: 7th November before 11:55 pm}
+
+\documentclass[11pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{ulem}
+\usepackage[margin=0.4in]{geometry}
+\begin{document}
+\maketitle
+
+\textbf{Remember the honor code while submitting this (and every other) assignment. You may discuss broad ideas with other students or ask me for any difficulties, but the code you implement and the answers you write must be your own. We will adopt a \textbf{zero-tolerance policy} against any violation.}
+\\
+\\
+\textbf{Submission instructions:} Follow the instructions for the submission format and the naming convention of your files from the submission guidelines file in the homework folder. Please see \textsf{assignment5\_DFT.rar}. Upload the file on moodle \emph{before} 11:55 pm on 7th November. We will not penalize any submissions till 10 am on 8th November. But after that, no submissions will be accepted. Only one student per group needs to upload the assignment. No late assignments will be accepted after this time. Please preserve a copy of all your work until the end of the semester.  
+
+\begin{enumerate}
+\item Read Section 1 of the paper `An FFT-Based Technique for Translation, Rotation, and Scale-Invariant Image Registration' published in the IEEE Transactions on Image Processing in August 1996. A copy of this paper is available in the homework folder. 
+\begin{enumerate}
+\item Describe the procedure in the paper to determine translation between two given images. What is the time complexity of this procedure to predict translation if the images were of size $N \times N$? How does it compare with the time complexity of pixel-wise image comparison procedure for predicting the translation? 
+\item Also, briefly explain the approach for correcting for rotation between two images, as proposed in this paper in Section II. Write down an equation or two to illustrate your point.
+\end{enumerate} \textsf{[10+10=20 points]}
+
+\item Suppose you are standing in a well-illuminated room with a large window, and you take a picture of the scene outside. The window undesirably acts as a semi-reflecting surface, and hence the picture will contain a reflection of the scene inside the room, besides the scene outside. While solutions exist for separating the two components from a single picture, here you will look at a simpler-to-solve version of this problem where you would take two pictures. The first picture $g_1$ is taken by adjusting your camera lens so that the scene outside ($f_1$) is in focus (we will assume that the scene outside has negligible depth variation when compared to the distance from the camera, and so it makes sense to say that the entire scene outside is in focus), and the reflection off the window surface ($f_2$) will now be defocussed or blurred.  This can be written as $g_1 = f_1 + h_2 * f_2$ where $h_2$ stands for the blur kernel that acted on $f_2$. The second picture $g_2$ is taken by focusing the camera onto the surface of the window, with the scene outside being defocussed. This can be written as $g_2 = h_1 * f_1 + f_2$ where $h_1$ is the blur kernel acting on $f_1$. Given $g_1$ and $g_2$, and assuming $h_1$ and $h_2$ are known, your task is to derive a formula to determine $f_1$ and $f_2$. Note that we are making the simplifying assumption that there was no relative motion between the camera and the scene outside while the two pictures were being acquired, and that there were no changes whatsoever to the scene outside or inside. Even with all these assumptions, you will notice something inherently problematic/unstable about the formula you will derive. What is it? \textsf{[8+7 = 15 points]}
+
+\item This is a fun exercise where you are officially allowed to do a google search and find out a research paper which works on an image restoration problem which is \emph{different} from all the ones we have seen in class. In your report, you should clearly state the problem, write the title, venue and publication year of the research paper, and mention the cost function that is optimized in the research paper in order to solve the problem. In the cost function, you should mention the meaning of all variables. For your reference, here is a list of restoration problems we have encountered in class: image denoising, image deblurring, image inpainting, reflection removal, stitching together images of torn pieces of paper (you saw this one in the midsem), notch filters for removal of periodic interference patterns in images. You are \emph{not} allowed to mention any of these. \textsf{[15 points]}
+
+\item Consider a $n \times n$ image $f(x,y)$ such that only $k \ll n^2$ elements in it are non-zero, where $k$ is known and the locations of the non-zero elements are also known. (a) How will you reconstruct such an image from a set of only $m$ different Discrete Fourier Transform (DFT) coefficients of known frequencies, where $m < n^2$? (b) What is the minimum value of $m$ that your method will allow? (c) Will your method work if $k$ is known, but the locations of the non-zero elements are unknown? Why (not)? \textsf{[10+5+5 = 20 points]}
+
+\item In this exercise, we will study a nice application of  the SVD which is widely used in computer vision, computer graphics and image processing. Consider we have a set of points $\boldsymbol{P}_1 \in \mathbb{R}^{2 \times N}$ and another set of points $\boldsymbol{P}_2 \in \mathbb{R}^{2 \times N}$ such that $\boldsymbol{P}_1$ and $\boldsymbol{P}_2$ are related by an orthonormal transformation $\boldsymbol{R}$ such that $\boldsymbol{P}_1 = \boldsymbol{R} \boldsymbol{P}_2 + \boldsymbol{E}$ where $\boldsymbol{E} \in \mathbb{R}^{2 \times N}$ is an error (or noise) matrix. The aim is to find $\boldsymbol{R}$ given $\boldsymbol{P}_1$ and $\boldsymbol{P}_2$ imposing the constraint that $\boldsymbol{R}$ is orthonormal. Answer the following questions: \textsf{[30 points = 3 + 3 + 3 + 3 + 3 + (8 + 4 + 3)]}
+
+\begin{enumerate}
+\item The standard least squares solution given by $\boldsymbol{R} = \boldsymbol{P_1} \boldsymbol{P_2}^T  (\boldsymbol{P_2} \boldsymbol{P_2}^T)^{-1}$ will fail. Why? 
+\item To solve for $\boldsymbol{R}$ incorporating the important constraints, we seek to minimize the following quantity:
+\begin{eqnarray}
+E(\boldsymbol{R}) = \|\boldsymbol{P_1} - \boldsymbol{R} \boldsymbol{P_2}\|^2_F \\
+= \textrm{trace}((\boldsymbol{P_1} -\boldsymbol{R} \boldsymbol{P_2})^T(\boldsymbol{P_1} - \boldsymbol{R} \boldsymbol{P_2})) \\
+= \textrm{trace}(\boldsymbol{P^T_1 P_1} + \boldsymbol{P^T_2 R^T R P_2} - \boldsymbol{P^T_2 R^T P_1} - \boldsymbol{P^T_1 R P_2}) \\
+= \textrm{trace}(\boldsymbol{P^T_1 P_1} + \boldsymbol{P^T_2 P_2} - \boldsymbol{P^T_2 R^T P_1} - \boldsymbol{P^T_1 R P_2})  \textrm{ (justify this step given the previous one) } \\
+= \textrm{trace}(\boldsymbol{P^T_1 P_1} + \boldsymbol{P^T_2 P_2}) -2\textrm{trace}(\boldsymbol{P^T_1 R P_2}) \textrm{ (justify this step given the previous one) } 
+\end{eqnarray}
+
+\item Why is minimizing $E(\boldsymbol{R})$ w.r.t. $\boldsymbol{R}$ is equivalent to maximizing $\textrm{trace}(\boldsymbol{P^T_1 R P_2})$ w.r.t. $\boldsymbol{R}$?
+
+\item Now, we have
+\begin{eqnarray}
+\textrm{trace}(\boldsymbol{P^T_1 R P_2}) = \textrm{trace}(\boldsymbol{R P_2 P^T_1})  \textrm{ ( justify this step ) } \\ 
+= \textrm{trace}(\boldsymbol{R U'S'V'^T}) \textrm{ using SVD of } \boldsymbol{P_2 P^T_1 = U'S'V'^T} \\
+= \textrm{trace}(\boldsymbol{S' V'^TR U'}) = \textrm{trace}(\boldsymbol{S' X}) \textrm{ where } \boldsymbol{X} = \boldsymbol{V'^TR U'} \\
+\end{eqnarray}
+
+\item For what matrix $\boldsymbol{X}$ will the above expression be maximized? (Note that $\boldsymbol{S'}$ is a diagonal matrix.)
+\item Given this $\boldsymbol{X}$, how will you determine $\boldsymbol{R}$? 
+\item If you had to impose the constraint that $\boldsymbol{R}$ is specifically a rotation matrix, what additional constraint would you need to impose? 
+\end{enumerate}
+
+
+\end{enumerate}
+\end{document}
+
