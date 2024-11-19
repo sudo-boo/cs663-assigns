@@ -1,4 +1,8 @@
-# cs663-assigns
+# CS663: Digital Image Processing (Autumn '24)
+
+### Instructor: Ajit Rajwade
+
+<br>
 
 | Assignment    | Deadline |
 | -------- | ------- |
