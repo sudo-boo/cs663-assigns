@@ -1,146 +1,213 @@
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 from scipy.fftpack import dct, idct
 from heapq import heappush, heappop
 from collections import defaultdict
-import matplotlib.pyplot as plt
-import os
 
-def block_dct(block):
-    """Apply 2D DCT on an image block."""
-    return dct(dct(block.T, norm='ortho').T, norm='ortho')
+# Convert image into grayscale using cv2
+def convert_to_grayscale(image):
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-def block_idct(block):
-    """Apply 2D inverse DCT on an image block."""
-    return idct(idct(block.T, norm='ortho').T, norm='ortho')
+# Convert image into 8x8 blocks
+def convert_to_blocks(image):
+    # Resize image to convert it into 8x8 blocks
+    image = cv2.resize(image, (np.int32(np.ceil(image.shape[1]/8)*8), np.int32(np.ceil(image.shape[0]/8)*8)))
+    blocks = []
+    for i in range(0, image.shape[0], 8):
+        for j in range(0, image.shape[1], 8):
+            blocks.append(image[i:i+8, j:j+8])
+    return blocks
 
-# Quantization matrix
-Q = np.array([
-    [16, 11, 10, 16, 24, 40, 51, 61],
-    [12, 12, 14, 19, 26, 58, 60, 55],
-    [14, 13, 16, 24, 40, 57, 69, 56],
-    [14, 17, 22, 29, 51, 87, 80, 62],
-    [18, 22, 37, 56, 68, 109, 103, 77],
-    [24, 35, 55, 64, 81, 104, 113, 92],
-    [49, 64, 78, 87, 103, 121, 120, 101],
-    [72, 92, 95, 98, 112, 100, 103, 99]
-])
+# Apply DCT to each block
+def apply_dct(blocks):
+    dct_blocks = []
+    for block in blocks:
+        dct_blocks.append(dct(dct(block.T, norm='ortho').T, norm='ortho'))
+    return dct_blocks
 
-def quantize(block, quality_factor):
-    """Quantize the DCT coefficients."""
-    scale = 50 / quality_factor if quality_factor < 50 else 2 - quality_factor / 50
-    scaled_Q = np.clip(Q * scale, 1, 255)
-    return np.round(block / scaled_Q).astype(int), scaled_Q
+# Quantize the DCT coefficients
+def quantize(blocks, quality):
+    quantization_matrix = np.array([
+        [16, 11, 10, 16, 24, 40, 51, 61],
+        [12, 12, 14, 19, 26, 58, 60, 55],
+        [14, 13, 16, 24, 40, 57, 69, 56],
+        [14, 17, 22, 29, 51, 87, 80, 62],
+        [18, 22, 37, 56, 68, 109, 103, 77],
+        [24, 35, 55, 64, 81, 104, 113, 92],
+        [49, 64, 78, 87, 103, 121, 120, 101],
+        [72, 92, 95, 98, 112, 100, 103, 99]
+    ])
+    quantization_matrix = quantization_matrix * (100 - quality) / 50
+    quantized_blocks = []
+    for block in blocks:
+        quantized_block = np.round(block / quantization_matrix).astype(int)
+        quantized_blocks.append(quantized_block)
+    return quantized_blocks
 
-def dequantize(block, scaled_Q):
-    """Dequantize the DCT coefficients."""
-    return block * scaled_Q
+# Perform Zigzag scanning to linearize the 8x8 block
+def zigzag_scanning(block):
+    zigzag = []
+    for i in range(8):
+        if i % 2 == 0:
+            for j in range(i+1):
+                zigzag.append(block[j, i-j])
+        else:
+            for j in range(i+1):
+                zigzag.append(block[i-j, j])
+    for i in range(1, 8):
+        if i % 2 == 0:
+            for j in range(8-i):
+                zigzag.append(block[7-j, i+j])
+        else:
+            for j in range(8-i):
+                zigzag.append(block[i+j, 7-j])
+    return zigzag
 
-def build_huffman_tree(frequencies):
-    """Build a Huffman tree given the symbol frequencies."""
-    heap = [[weight, [symbol, ""]] for symbol, weight in frequencies.items()]
-    while len(heap) > 1:
-        heappush(heap, [heappop(heap)[0] + heappop(heap)[0]] + [heappop(heap), heappop(heap)])
-    return sorted(heappop(heap)[1:], key=lambda p: (len(p[-1]), p))
-
+# Huffman encoding to compress the linearized data
 def huffman_encoding(data):
-    """Perform Huffman encoding on the input data."""
-    frequency = defaultdict(int)
-    for symbol in data:
-        frequency[symbol] += 1
-    huffman_tree = build_huffman_tree(frequency)
-    huffman_dict = {item[0]: item[1] for item in huffman_tree}
-    encoded_data = "".join(huffman_dict[symbol] for symbol in data)
+    from collections import Counter, defaultdict
+    from heapq import heappush, heappop, heapify
+
+    frequency = Counter(data)
+    heap = [[weight, [symbol, ""]] for symbol, weight in frequency.items()]
+    heapify(heap)
+    
+    while len(heap) > 1:
+        lo = heappop(heap)
+        hi = heappop(heap)
+        for pair in lo[1:]:
+            pair[1] = '0' + pair[1]
+        for pair in hi[1:]:
+            pair[1] = '1' + pair[1]
+        heappush(heap, [lo[0] + hi[0]] + lo[1:] + hi[1:])
+    
+    codes = sorted(heappop(heap)[1:], key=lambda p: (len(p[-1]), p))
+    huffman_dict = {symbol: code for symbol, code in codes}
+    
+    encoded_data = "".join([huffman_dict[d] for d in data])
     return encoded_data, huffman_dict
 
+# Apply this compression on ex.png
+def compress_image(image, quality):
+    image = convert_to_grayscale(image)
+    blocks = convert_to_blocks(image)
+    dct_blocks = apply_dct(blocks)
+    quantized_blocks = quantize(dct_blocks, quality)
+    zigzag_blocks = []
+    for block in quantized_blocks:
+        zigzag_blocks.append(zigzag_scanning(block))
+    encoded_data = ""
+    huffman_dict = None
+    for block in zigzag_blocks:
+        encoded, huffman_dict = huffman_encoding(block)
+        encoded_data += encoded
+    return encoded_data, huffman_dict
+
+# Huffman decoding to decompress the encoded data
 def huffman_decoding(encoded_data, huffman_dict):
-    """Decode Huffman encoded data."""
-    reversed_dict = {v: k for k, v in huffman_dict.items()}
-    decoded = []
-    buffer = ""
+    reverse_huffman_dict = {v: k for k, v in huffman_dict.items()}
+    decoded_data = []
+    code = ""
     for bit in encoded_data:
-        buffer += bit
-        if buffer in reversed_dict:
-            decoded.append(reversed_dict[buffer])
-            buffer = ""
-    return decoded
+        code += bit
+        if code in reverse_huffman_dict:
+            decoded_data.append(reverse_huffman_dict[code])
+            code = ""
+    return decoded_data
 
-def compress_image(image, block_size, quality_factor):
-    h, w = image.shape
-    compressed_blocks = []
-    scales = []
-    
-    # Divide image into non-overlapping blocks
-    for i in range(0, h, block_size):
-        for j in range(0, w, block_size):
-            block = image[i:i+block_size, j:j+block_size]
-            dct_block = block_dct(block)
-            quantized_block, scaled_Q = quantize(dct_block, quality_factor)
-            compressed_blocks.append(quantized_block.flatten())
-            scales.append(scaled_Q.flatten())
-    
-    # Flatten and Huffman encode all blocks
-    flat_data = np.hstack(compressed_blocks).flatten()
-    encoded_data, huffman_dict = huffman_encoding(flat_data)
-    return encoded_data, huffman_dict, h, w, scales
+# Perform inverse zigzag scanning to convert a 1D array back to a 2D block
+def inverse_zigzag_scanning(input, vmax, hmax):
+    output = np.zeros((vmax, hmax), dtype=int)
+    i = j = 0
+    for k in range(len(input)):
+        output[i, j] = input[k]
+        if (i + j) % 2 == 0:  # Even stripes
+            if j < hmax - 1:
+                j += 1
+            elif i < vmax - 1:
+                i += 1
+            else:
+                break
+            if i > 0:
+                i -= 1
+        else:  # Odd stripes
+            if i < vmax - 1:
+                i += 1
+            elif j < hmax - 1:
+                j += 1
+            else:
+                break
+            if j > 0:
+                j -= 1
+    return output
 
-def decompress_image(encoded_data, huffman_dict, h, w, scales, block_size):
-    decoded_data = huffman_decoding(encoded_data, huffman_dict)
-    decompressed_image = np.zeros((h, w))
-    
-    # Decode blocks
-    idx = 0
-    for i in range(0, h, block_size):
-        for j in range(0, w, block_size):
-            quantized_block = np.array(decoded_data[idx:idx + block_size**2]).reshape(block_size, block_size)
-            scaled_Q = np.array(scales[idx // block_size**2]).reshape(block_size, block_size)
-            idct_block = block_idct(dequantize(quantized_block, scaled_Q))
-            decompressed_image[i:i+block_size, j:j+block_size] = idct_block
-            idx += block_size**2
-    
-    return np.clip(decompressed_image, 0, 255).astype(np.uint8)
+# Dequantize the quantized DCT coefficients
+def dequantize(blocks, quality):
+    quantization_matrix = np.array([
+        [16, 11, 10, 16, 24, 40, 51, 61],
+        [12, 12, 14, 19, 26, 58, 60, 55],
+        [14, 13, 16, 24, 40, 57, 69, 56],
+        [14, 17, 22, 29, 51, 87, 80, 62],
+        [18, 22, 37, 56, 68, 109, 103, 77],
+        [24, 35, 55, 64, 81, 104, 113, 92],
+        [49, 64, 78, 87, 103, 121, 120, 101],
+        [72, 92, 95, 98, 112, 100, 103, 99]
+    ])
+    quantization_matrix = quantization_matrix * (100 - quality) / 50
+    dequantized_blocks = []
+    for block in blocks:
+        dequantized_block = block * quantization_matrix
+        dequantized_blocks.append(dequantized_block)
+    return dequantized_blocks
 
-def calculate_rmse(original, compressed):
-    return np.sqrt(np.mean((original - compressed) ** 2))
+# Apply Inverse Discrete Cosine Transform (IDCT) to each block
+def apply_idct(blocks):
+    idct_blocks = []
+    for block in blocks:
+        idct_blocks.append(idct(idct(block.T, norm='ortho').T, norm='ortho'))
+    return idct_blocks
 
-def calculate_bpp(compressed_size, image_shape):
-    total_pixels = image_shape[0] * image_shape[1]
-    return compressed_size / total_pixels
-
-def main():
-    # Parameters
+# Reconstruct the image from the encoded data
+def reconstruct_image(encoded_data, huffman_dict, image_shape, quality):
     block_size = 8
-    quality_factors = [10, 20, 30, 50, 70, 90]  # Test multiple quality factors
-    
-    # Load grayscale image
-    image = cv2.imread("C:\Users\surya\OneDrive - Indian Institute of Technology Bombay\docmain\sem5\cs663\cs663-assigns\Project\Microsoft-Database\sheep\108_0890.JPG", cv2.IMREAD_GRAYSCALE)
-    
-    rmse_results = []
-    bpp_results = []
-    
-    for quality in quality_factors:
-        encoded_data, huffman_dict, h, w, scales = compress_image(image, block_size, quality)
-        compressed_size = len(encoded_data)
-        
-        decompressed_image = decompress_image(encoded_data, huffman_dict, h, w, scales, block_size)
-        
-        rmse = calculate_rmse(image, decompressed_image)
-        bpp = calculate_bpp(compressed_size, image.shape)
-        
-        rmse_results.append(rmse)
-        bpp_results.append(bpp)
-        
-        # Save decompressed image for visualization
-        cv2.imwrite(f"decompressed_q{quality}.png", decompressed_image)
-    
-    # Plot RMSE vs BPP
-    plt.figure()
-    plt.plot(bpp_results, rmse_results, marker='o')
-    plt.xlabel("Bits Per Pixel (BPP)")
-    plt.ylabel("RMSE")
-    plt.title("RMSE vs BPP")
-    plt.grid()
-    plt.show()
+    zigzag_blocks = []
+    i = 0
+    while i < len(encoded_data):
+        j = i + block_size * block_size
+        zigzag_blocks.append(huffman_decoding(encoded_data[i:j], huffman_dict))
+        i = j
+    blocks = []
+    for zigzag_block in zigzag_blocks:
+        block = inverse_zigzag_scanning(zigzag_block, block_size, block_size)
+        blocks.append(block)
+    dequantized_blocks = dequantize(blocks, quality)
+    idct_blocks = apply_idct(dequantized_blocks)
+    reconstructed_image = np.zeros(image_shape)
+    k = 0
+    for i in range(0, image_shape[0], block_size):
+        for j in range(0, image_shape[1], block_size):
+            if k < len(idct_blocks):
+                reconstructed_image[i:i+block_size, j:j+block_size] = idct_blocks[k]
+                k += 1
+    reconstructed_image = np.clip(reconstructed_image, 0, 255)
+    return np.uint8(reconstructed_image)
 
-if __name__ == "__main__":
-    main()
+# Example usage
+image = cv2.imread("ex.png")
+encoded_data, huffman_dict = compress_image(image, 50)
+image_shape = image.shape[:2]
+reconstructed_image = reconstruct_image(encoded_data, huffman_dict, image_shape, 50)
+cv2.imwrite("reconstructed_image.png", reconstructed_image)
+
+# Display the original and reconstructed images
+plt.figure(figsize=(10, 5))
+plt.subplot(1, 2, 1)
+plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+plt.title("Original Image")
+plt.axis("off")
+plt.subplot(1, 2, 2)
+plt.imshow(reconstructed_image, cmap='gray')
+plt.title("Reconstructed Image")
+plt.axis("off")
+plt.show()
