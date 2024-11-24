@@ -428,54 +428,83 @@ def rmse_bpp(original, compressed, path):
     return bpp, rmse
 
 
-# downsampling Cb and Cr channels
 def downsample(img):
     """
-    Downsample the Cb and Cr channels by a factor of 2.
+    Downsample the Cb and Cr channels using proper chroma subsampling (4:2:0).
+    The Y channel remains at full resolution.
     """
     y, cb, cr = cv2.split(img)
-    cb = cv2.resize(cb, (cb.shape[1] // 2, cb.shape[0] // 2))
-    cr = cv2.resize(cr, (cr.shape[1] // 2, cr.shape[0] // 2))
-    cb = cv2.resize(cb, (y.shape[1], y.shape[0]))
-    cr = cv2.resize(cr, (y.shape[1], y.shape[0]))
 
-    return cv2.merge((y, cb, cr))
+    # Downsample Cb and Cr channels by a factor of 2 (4:2:0 subsampling)
+    cb_down = cb[::2, ::2]
+    cr_down = cr[::2, ::2]
+
+    return y, cb_down, cr_down
+
+
+
+def upsample(cb, cr, target_shape):
+    """
+    Upsample the Cb and Cr channels to match the shape of the Y channel.
+    """
+    cb_up = cv2.resize(cb, (target_shape[1], target_shape[0]), interpolation=cv2.INTER_LINEAR)
+    cr_up = cv2.resize(cr, (target_shape[1], target_shape[0]), interpolation=cv2.INTER_LINEAR)
+    return cb_up, cr_up
 
 
 def jpeg_compression(img, q_table, output_dir="output/compressed_imgs"):
     """Compresses a YCbCr image using JPEG compression.
 
     Args:
-        img (np.ndarray): YCbCr image.
-        q_table (np.ndarray): Quantization table.
+        img (np.ndarray): Original BGR image.
+        q_table (dict): Mapping of quality factors to quantization tables.
+        output_dir (str): Directory to save compressed images.
 
     Returns:
-        np.ndarray: Compressed image.
+        list: Metrics (BPP, RMSE) for each quality factor.
     """
-    img = bgr2ycbcr(img)
-    img = downsample(img)
-    channels = cv2.split(img)
+    img_ycbcr = bgr2ycbcr(img)
 
+    # Downsample Cb and Cr channels
+    y, cb_down, cr_down = downsample(img_ycbcr)
+
+    # Process each quality factor
     metrics = []
-
     for q_factor, q_table in q_table.items():
+        print(f"\tCompressing image with quality factor {q_factor}...")
         compressed_channels = []
-        for channel in channels:
-            hf_stream, hf_tree, hf_dict, symb_dict, dims = encode_JPEG(channel, q_table)
-            decoded = decode_jpeg(hf_stream, hf_tree, dims, q_table)
-            compressed_channels.append(decoded)
-        compressed_ycbcr = cv2.merge(compressed_channels)
-        compressed_ycbcr = np.array(compressed_ycbcr, dtype=np.uint8)
-        compressed = ycbcr2bgr(compressed_ycbcr)
-        
 
+        # Compress the Y channel
+        hf_stream, hf_tree, hf_dict, symb_dict, dims = encode_JPEG(y, q_table)
+        decoded_y = decode_jpeg(hf_stream, hf_tree, dims, q_table)
+        compressed_channels.append(decoded_y)
+
+        # Compress the downsampled Cb channel
+        hf_stream, hf_tree, hf_dict, symb_dict, dims = encode_JPEG(cb_down, q_table)
+        decoded_cb_down = decode_jpeg(hf_stream, hf_tree, dims, q_table)
+
+        # Compress the downsampled Cr channel
+        hf_stream, hf_tree, hf_dict, symb_dict, dims = encode_JPEG(cr_down, q_table)
+        decoded_cr_down = decode_jpeg(hf_stream, hf_tree, dims, q_table)
+
+        # Upsample Cb and Cr to match Y channel size
+        decoded_cb, decoded_cr = upsample(decoded_cb_down, decoded_cr_down, y.shape)
+
+        # Recombine the channels
+        compressed_ycbcr = cv2.merge((decoded_y, decoded_cb, decoded_cr))
+        compressed_ycbcr = np.clip(compressed_ycbcr, 0, 255).astype(np.uint8)
+        compressed = ycbcr2bgr(compressed_ycbcr)
+
+        # Save compressed image
         path = os.path.join(output_dir, f"{q_factor}.jpg")
         cv2.imwrite(path, compressed)
 
+        # Calculate metrics
         bpp, rmse = rmse_bpp(img, compressed, path)
         metrics.append((bpp, rmse))
 
     return metrics
+
 
 
 def main():
@@ -490,7 +519,7 @@ def main():
     imgs = [cv2.imread(file) for file in files]
 
     q_factors = [
-        5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 
+        25, 30, 35, 40, 45, 50, 
         55, 60, 65, 70, 75, 80, 85, 90, 95
         ]
     q_tables = {q: generate_qtable(BASE_QTABLE, q) for q in q_factors}
@@ -500,6 +529,8 @@ def main():
 
     plt.figure(figsize=(25, 25))
     for i in range(len(imgs)):
+
+        print(f"Processing image {i+1}...")
         img = imgs[i]
         img_name = f"img{i+1}"
         cv2.imwrite(f"{original_path}/{img_name}.jpg", img)
@@ -508,6 +539,8 @@ def main():
         metrics = jpeg_compression(img, q_tables, path_to_com_img)
         bpps, rmses = zip(*metrics)
         plt.plot(bpps, rmses, label=img_name, marker="o", markersize=20)
+
+    print("Prcoessing completed!")
 
     plt.xlabel("Bits Per Pixel", fontsize=30)
     plt.ylabel("RMSE", fontsize=30)
