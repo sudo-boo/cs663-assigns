@@ -428,8 +428,8 @@ def rmse_bpp(original, q_tables, image_dims, output_dir):
 
 def main():
     # load the images from Microsodt-Database folder
-    dir_path = "../Microsoft-Database/"
-    files = glob.glob(dir_path + "sheep/*.JPG")
+    dir_path = "../Microsoft-Database/gray-imgs"
+    files = glob.glob(dir_path + "/*.png")
     img_path = "output/compressed_imgs"
     original_path = "output/original_imgs"
     plot_path = "output/plot.png"

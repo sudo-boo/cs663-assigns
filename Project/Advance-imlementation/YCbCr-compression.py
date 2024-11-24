@@ -21,6 +21,7 @@ BASE_QTABLE = np.array(
     ]
 )
 
+
 def bgr2ycbcr(img):
     """Converts a BGR image to YCbCr color space.
 
@@ -32,6 +33,7 @@ def bgr2ycbcr(img):
     """
     ycbcr = cv2.cvtColor(img, cv2.COLOR_BGR2YCR_CB)
     return ycbcr
+
 
 def ycbcr2bgr(img):
     """Converts a YCbCr image to BGR color space.
@@ -419,37 +421,11 @@ def decode_jpeg(hf_stream, hf_tree, image_dims, q_table):
     return ret_image
 
 
-def rmse_bpp(original, q_tables, image_dims, output_dir):
-    """Compute the RMSE and BPP for different quality factors.
-    Arguments:
-    original: The original image.
-    q_tables: A dictionary of quality factors and their corresponding quantization tables.
-    image_dims: The dimensions of the original image.
-    output_dir: The directory to save the compressed images.
-
-    Returns:
-    bpps: List of bits per pixel for each quality factor.
-    rmses: List of RMSE values for each quality factor.
-
-    """
-
-    bpps = []
-    rmses = []
-    for q_factor, q_table in q_tables.items():
-        hf_stream, hf_tree, hf_dict, symb_dict, dims = encode_JPEG(original, q_table)
-        decoded = decode_jpeg(hf_stream, hf_tree, dims, q_table)
-        path = os.path.join(output_dir, f"{q_factor}.jpg")
-        cv2.imwrite(path, decoded)
-        size = os.path.getsize(path)
-        rmse = calculate_rmse(original, decoded)
-        bpp = calculate_bpp(size, image_dims)
-
-        bpps.append(bpp)
-        rmses.append(rmse)
-
-    return bpps, rmses
-
-
+def rmse_bpp(original, compressed, path):
+    """Compute the Root Mean Squared Error (RMSE) between two images."""
+    rmse = calculate_rmse(original, compressed)
+    bpp = calculate_bpp(os.path.getsize(path), original.shape)
+    return bpp, rmse
 
 
 # downsampling Cb and Cr channels
@@ -462,30 +438,50 @@ def downsample(img):
     cr = cv2.resize(cr, (cr.shape[1] // 2, cr.shape[0] // 2))
     cb = cv2.resize(cb, (y.shape[1], y.shape[0]))
     cr = cv2.resize(cr, (y.shape[1], y.shape[0]))
-    
+
     return cv2.merge((y, cb, cr))
 
-# upsampling Cb and Cr channels
-# def upsample(img):
-#     """Upsamples the Cb and Cr channels of a YCbCr image by a factor of 2.
 
-#     Args:
-#         img (np.ndarray): YCbCr image.
+def jpeg_compression(img, q_table, output_dir="output/compressed_imgs"):
+    """Compresses a YCbCr image using JPEG compression.
 
-#     Returns:
-#         np.ndarray: Upsampled YCbCr image.
-#     """
-#     y, cb, cr = cv2.split(img)
-#     cb = cv2.resize(cb, (0, 0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
-#     cr = cv2.resize(cr, (0, 0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
-#     return cv2.merge((y, cb, cr))
+    Args:
+        img (np.ndarray): YCbCr image.
+        q_table (np.ndarray): Quantization table.
 
+    Returns:
+        np.ndarray: Compressed image.
+    """
+    img = bgr2ycbcr(img)
+    img = downsample(img)
+    channels = cv2.split(img)
+
+    metrics = []
+
+    for q_factor, q_table in q_table.items():
+        compressed_channels = []
+        for channel in channels:
+            hf_stream, hf_tree, hf_dict, symb_dict, dims = encode_JPEG(channel, q_table)
+            decoded = decode_jpeg(hf_stream, hf_tree, dims, q_table)
+            compressed_channels.append(decoded)
+        compressed_ycbcr = cv2.merge(compressed_channels)
+        compressed_ycbcr = np.array(compressed_ycbcr, dtype=np.uint8)
+        compressed = ycbcr2bgr(compressed_ycbcr)
+        
+
+        path = os.path.join(output_dir, f"{q_factor}.jpg")
+        cv2.imwrite(path, compressed)
+
+        bpp, rmse = rmse_bpp(img, compressed, path)
+        metrics.append((bpp, rmse))
+
+    return metrics
 
 
 def main():
     # load the images from Microsodt-Database folder
-    dir_path = "../Microsoft-Database/"
-    files = glob.glob(dir_path + "flowers/*.JPG")
+    dir_path = "../Microsoft-Database/colored-imgs"
+    files = glob.glob(dir_path + "/*.png")
     img_path = "output/compressed_imgs"
     original_path = "output/original_imgs"
     plot_path = "output/plot.png"
@@ -494,9 +490,9 @@ def main():
     imgs = [cv2.imread(file) for file in files]
 
     q_factors = [
-        5,
-        10,
-    ]
+        5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 
+        55, 60, 65, 70, 75, 80, 85, 90, 95
+        ]
     q_tables = {q: generate_qtable(BASE_QTABLE, q) for q in q_factors}
 
     os.makedirs(img_path, exist_ok=True)
@@ -506,80 +502,17 @@ def main():
     for i in range(len(imgs)):
         img = imgs[i]
         img_name = f"img{i+1}"
-        img = cv2.resize(img, (256, 256))
         cv2.imwrite(f"{original_path}/{img_name}.jpg", img)
-        img = bgr2ycbcr(img)
-        img = downsample(img)
-    
-        y = img[:, :, 0]
-        cb = img[:, :, 1]
-        cr = img[:, :, 2]
-        
-        # print(y.shape, cb.shape, cr.shape)
-        print(img)
-        print('\n')
-
-        os.makedirs(f"{img_path}/{img_name}", exist_ok=True)
-        os.makedirs(f"{img_path}/{img_name}/y", exist_ok=True)
-        os.makedirs(f"{img_path}/{img_name}/cb", exist_ok=True)
-        os.makedirs(f"{img_path}/{img_name}/cr", exist_ok=True)
-
-        bpps_y, rmses_y = rmse_bpp(y, q_tables, y.shape, f"{img_path}/{img_name}/y")
-        bpps_cb, rmses_cb = rmse_bpp(cb, q_tables, cb.shape, f"{img_path}/{img_name}/cb")
-        bpps_cr, rmses_cr = rmse_bpp(cr, q_tables, cr.shape, f"{img_path}/{img_name}/cr")
-
-    # read y,cb and cr images
-    y_imgs = glob.glob(f"{img_path}/{img_name}/y/*.jpg")
-    cb_imgs = glob.glob(f"{img_path}/{img_name}/cb/*.jpg")
-    cr_imgs = glob.glob(f"{img_path}/{img_name}/cr/*.jpg")
-
-    y_files = []
-    cb_files = []
-    cr_files = []
-    for i in range(len(y_imgs)):
-        y_files.append(cv2.imread(y_imgs[i], cv2.IMREAD_GRAYSCALE))
-        cb_files.append(cv2.imread(cb_imgs[i], cv2.IMREAD_GRAYSCALE))
-        cr_files.append(cv2.imread(cr_imgs[i], cv2.IMREAD_GRAYSCALE))
-    
-    for y,cb,cr in zip(y_files,cb_files,cr_files):
-        i = 0
-        while i < 21:
-            img_name = f"img{i+1}"
-            y = cv2.resize(y, (256, 256))
-            cb = cv2.resize(cb, (256, 256))
-            cr = cv2.resize(cr, (256, 256))
-
-            img = cv2.merge((y, cb, cr))
-            img = ycbcr2bgr(img)
-            mpimg.imsave(f"{img_path}/{img_name}.jpg", img)
-            i += 1 
-        
-
-    # plottning rmse vs bpp for every file corresponding to every quality factor
-    for i in range(len(imgs)):
-        compressed_path = glob.glob(f"{img_path}/img{i+1}/*.jpg")
-        # original_path = glob.glob(f"{original_path}/img{i+1}.jpg")
-
-        compressed_imgs = [cv2.imread(file, cv2.IMREAD_GRAYSCALE) for file in compressed_path]
-        original_img = cv2.imread(f"{original_path}/img{i+1}.jpg", cv2.IMREAD_GRAYSCALE)
-
-        rmses = []
-        bpps = []
-        for j in range(len(compressed_imgs)):
-            compressed = compressed_imgs[j]
-            original = original_img
-            rmse = calculate_rmse(original, compressed)
-            bpp = calculate_bpp(os.path.getsize(compressed_path[j]), original.shape)
-            rmses.append(rmse)
-            bpps.append(bpp)
-        
-        plt.plot(bpps, rmses, label=f"img{i+1}", marker="o", markersize=15)
+        path_to_com_img = f"{img_path}/{img_name}"
+        os.makedirs(path_to_com_img, exist_ok=True)
+        metrics = jpeg_compression(img, q_tables, path_to_com_img)
+        bpps, rmses = zip(*metrics)
+        plt.plot(bpps, rmses, label=img_name, marker="o", markersize=20)
 
     plt.xlabel("Bits Per Pixel", fontsize=30)
     plt.ylabel("RMSE", fontsize=30)
     plt.legend(fontsize=20)
     plt.savefig(plot_path)
-
 
 
 if __name__ == "__main__":
