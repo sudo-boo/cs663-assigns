@@ -4,17 +4,18 @@ from skimage import io, color
 import os
 import glob
 
-
+# applying PCA on the block of the image
 def compress_block_pca(block, num_components):
     """
     Compress a block using PCA.
 
     Parameters:
-    - block: 2D NumPy array representing a grayscale block.
+    - block: 2D NumPy array representing the block.
     - num_components: Number of principal components to retain.
 
     Returns:
-    - compressed_block: Reconstructed block after PCA compression.
+    - block_compressed: Reconstructed block after PCA compression.
+    - variance_explained: Percentage of variance explained by the retained components.
     """
     # Step 1: Mean normalization
     mean_block = np.mean(block, axis=1, keepdims=True)
@@ -28,137 +29,108 @@ def compress_block_pca(block, num_components):
 
     # Step 4: Sort eigenvalues and eigenvectors in descending order
     sorted_indices = np.argsort(eigenvalues)[::-1]
+    eigenvalues = eigenvalues[sorted_indices]
     eigenvectors = eigenvectors[:, sorted_indices]
 
     # Step 5: Retain the top `num_components` eigenvectors
     principal_components = eigenvectors[:, :num_components]
 
-    # Step 6: Project the block into the PCA subspace
+    # Step 6: Project the block data into the PCA subspace
     transformed_data = np.dot(principal_components.T, centered_block)
 
     # Step 7: Reconstruct the block
-    reconstructed_block = np.dot(principal_components, transformed_data) + mean_block
+    block_compressed = np.dot(principal_components, transformed_data) + mean_block
 
-    return reconstructed_block
+    # Calculate variance explained
+    variance_explained = np.sum(eigenvalues[:num_components]) / np.sum(eigenvalues)
 
+    return block_compressed, variance_explained
 
-def apply_local_pca(image, block_size, num_components):
+# applying PCA on the every block of the image
+def compress_image_pca(image, num_components, block_size=8):
     """
-    Apply PCA locally to an image in blocks of size `block_size`.
+    Compress a grayscale image using PCA.
 
     Parameters:
     - image: 2D NumPy array representing the grayscale image.
-    - block_size: Size of the square block (e.g., 8 for 8x8 blocks).
     - num_components: Number of principal components to retain.
+    - block_size: Size of the blocks to divide the image into.
 
     Returns:
-    - compressed_image: Image reconstructed after applying PCA locally.
+    - compressed_image: Reconstructed image after PCA compression.
+    - variance_explained: Percentage of variance explained by the retained components.
     """
-    compressed_image = np.zeros_like(image)
-    h, w = image.shape
+    # Step 1: Divide the image into blocks
+    height, width = image.shape
+    compressed_image = np.zeros((height, width))
 
-    for i in range(0, h, block_size):
-        for j in range(0, w, block_size):
-            # Extract the current block
-            block = image[i:i + block_size, j:j + block_size]
+    for i in range(0, height, block_size):
+        for j in range(0, width, block_size):
+            block = image[i:i+block_size, j:j+block_size]
 
-            # Handle edge cases where the block size is smaller (near boundaries)
-            if block.shape[0] < block_size or block.shape[1] < block_size:
+            # Ensure the block is of the correct size
+            if block.shape[0] != block_size or block.shape[1] != block_size:
                 continue
 
-            # Apply PCA to the block
-            compressed_block = compress_block_pca(block, num_components)
+            # Step 2: Apply PCA on the block
+            block_compressed, _ = compress_block_pca(block, num_components)
 
-            # Store the compressed block back in the image
-            compressed_image[i:i + block_size, j:j + block_size] = compressed_block
+            # Step 3: Reconstruct the block
+            compressed_image[i:i+block_size, j:j+block_size] = block_compressed
 
     return compressed_image
 
-
-def bpp(image_path,img_name, num_components, class_name):
-    """
-    Calculate the bits per pixel (BPP) for the compressed image.
-
-    Parameters:
-    - img_name: Name of the image file.
-    - num_components: Number of PCA components used for compression.
-    - class_name: Folder name for the image class.
-
-    Returns:
-    - bpp: Bits per pixel for the compressed image.
-    """
-    compressed_image_path = f"output/compressed/{class_name}/{img_name}/{num_components}.png"
-    compressed_image = io.imread(compressed_image_path)
-
-    # Calculate the number of bits per pixel
-    file_size_bits = os.path.getsize(compressed_image_path) * 8
-    image_area = compressed_image.shape[0] * compressed_image.shape[1]
-    bpp_value = file_size_bits / image_area
-
-    return bpp_value
-
-
+#calculating rmse between two images
 def rmse(imageA, imageB):
-    """
-    Calculate the Root Mean Squared Error (RMSE) between two images.
-
-    Parameters:
-    - imageA: First image (original).
-    - imageB: Second image (compressed).
-
-    Returns:
-    - RMSE: Root mean squared error.
-    """
     return np.sqrt(np.mean((imageA - imageB) ** 2))
 
+# calculating bpp for the compressed image
+def bpp(image_path, img_name, num_components, class_name):
+    compressed_image = io.imread(f"output/compressed/{class_name}/{img_name}/{num_components}.png")
+    compressed_image = compressed_image.astype(float)
 
-def main(image_path, img_name, num_components, block_size, class_name):
+    # Calculate the number of bits per pixel
+    bpp = (os.path.getsize(f"output/compressed/{class_name}/{img_name}/{num_components}.png") * 8) / (compressed_image.shape[0] * compressed_image.shape[1])
+
+    return bpp
+
+# Load and preprocess the image
+def main(image_path, img_name, num_components, class_name):
     image = io.imread(image_path)
     if image.ndim == 3:  # Convert to grayscale if it's an RGB image
         image = color.rgb2gray(image)
     image = image.astype(float)
 
-    # Compress the image using local PCA
-    compressed_image = apply_local_pca(image, block_size, num_components)
+    # Compress the image using PCA
+    compressed_image = compress_image_pca(image, num_components)
     image = image.astype(np.uint8)
     compressed_image = compressed_image.astype(np.uint8)
 
-    # Create output directories
-    os.makedirs(f"output/original/{class_name}", exist_ok=True)
+    # saving the compressed image and original image
     os.makedirs(f"output/compressed/{class_name}/{img_name}", exist_ok=True)
+    os.makedirs(f"output/original/{class_name}", exist_ok=True)
 
-    # Save the images
-    io.imsave(f"output/original/{class_name}/{img_name}.png", image)
     io.imsave(f"output/compressed/{class_name}/{img_name}/{num_components}.png", compressed_image)
-
+    io.imsave(f"output/original/{class_name}/{img_name}.png", image)
 
 if __name__ == "__main__":
     imgs_path = "../Microsoft-Database/pca-gray/"
-    block_size = 8  # Block size for local PCA
-    num_components_list = [30, 40, 50, 60, 70, 80, 90]
+    num_components = [30, 40, 50, 60, 70, 80, 90]
+    
+    buildings = glob.glob(imgs_path + "buildings/*.png")    
 
-    buildings = glob.glob(imgs_path + "buildings/*.png")
-
-    plt.figure(figsize=(25, 25))
+    plt.figure(figsize=(25,25))
     for i, img_path in enumerate(buildings):
-        print(f"Processing image {i+1}...")
         img_name = f"img{i+1}"
         bpp_buildings = []
         rmse_buildings = []
-        for num_components in num_components_list:
-            print(f"\twith {num_components} components...")
-            main(img_path, img_name, num_components, block_size, "buildings")
-            bpp_buildings.append(bpp(img_path, img_name, num_components, "buildings"))
-            rmse_buildings.append(rmse(
-                io.imread(f"output/original/buildings/{img_name}.png"),
-                io.imread(f"output/compressed/buildings/{img_name}/{num_components}.png")
-            ))
-        plt.plot(bpp_buildings, rmse_buildings, label=f"img{i+1}", marker='o', markersize=10)
-    
-    print("Processing complete!")
-
-    plt.xlabel("BPP", fontsize=20)
-    plt.ylabel("RMSE", fontsize=20)
-    plt.legend(fontsize=15)
+        for num in num_components:
+            main(img_path, img_name, num, "buildings")
+            bpp_buildings.append(bpp(img_path, img_name, num, "buildings"))
+            rmse_buildings.append(rmse(io.imread(f"output/original/buildings/{img_name}.png"), io.imread(f"output/compressed/buildings/{img_name}/{num}.png")))
+        plt.plot(bpp_buildings, rmse_buildings, label=f"img{i+1}", marker='o', markersize=30)
+    plt.xlabel("BPP", fontsize=40)
+    plt.ylabel("RMSE", fontsize=40)
+    plt.legend(fontsize=35)
     plt.grid()
     plt.savefig("output/plot.png")
