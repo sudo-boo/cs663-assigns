@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import io, color
+from sklearn.decomposition import PCA
 import os
 import glob
 
@@ -17,8 +18,8 @@ def compress_block_pca(block, num_components):
     - block_compressed: Reconstructed block after PCA compression.
     - variance_explained: Percentage of variance explained by the retained components.
     """
-    # Step 1: Mean normalization
-    mean_block = np.mean(block, axis=1, keepdims=True)
+
+    mean_block = np.mean(block, axis=0, keepdims=True)
     centered_block = block - mean_block
 
     # Step 2: Compute the covariance matrix
@@ -26,6 +27,8 @@ def compress_block_pca(block, num_components):
 
     # Step 3: Compute eigenvalues and eigenvectors
     eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+    # print(eigenvalues)
+    # print("-----------------------------")
 
     # Step 4: Sort eigenvalues and eigenvectors in descending order
     sorted_indices = np.argsort(eigenvalues)[::-1]
@@ -41,13 +44,10 @@ def compress_block_pca(block, num_components):
     # Step 7: Reconstruct the block
     block_compressed = np.dot(principal_components, transformed_data) + mean_block
 
-    # Calculate variance explained
-    variance_explained = np.sum(eigenvalues[:num_components]) / np.sum(eigenvalues)
-
-    return block_compressed, variance_explained
+    return block_compressed
 
 # applying PCA on the every block of the image
-def compress_image_pca(image, num_components, block_size=8):
+def compress_image_pca(image, num_components, block_size=16):
     """
     Compress a grayscale image using PCA.
 
@@ -73,26 +73,31 @@ def compress_image_pca(image, num_components, block_size=8):
                 continue
 
             # Step 2: Apply PCA on the block
-            block_compressed, _ = compress_block_pca(block, num_components)
+            block_compressed = compress_block_pca(block, num_components)
 
             # Step 3: Reconstruct the block
             compressed_image[i:i+block_size, j:j+block_size] = block_compressed
+
+
 
     return compressed_image
 
 #calculating rmse between two images
 def rmse(imageA, imageB):
-    return np.sqrt(np.mean((imageA - imageB) ** 2))
+    sum_sq = np.sum((imageA.astype("float")) ** 2)
+    forbenius_norm = np.sqrt(sum_sq / float(imageA.shape[0] * imageA.shape[1]))
+    return np.sqrt(np.mean((imageA - imageB) ** 2))/forbenius_norm
+
 
 # calculating bpp for the compressed image
-def bpp(image_path, img_name, num_components, class_name):
-    compressed_image = io.imread(f"output/compressed/{class_name}/{img_name}/{num_components}.png")
-    compressed_image = compressed_image.astype(float)
+# def bpp(image_path, img_name, num_components, class_name):
+#     compressed_image = io.imread(f"output/compressed/{class_name}/{img_name}/{num_components}.png")
+#     compressed_image = compressed_image.astype(float)
 
-    # Calculate the number of bits per pixel
-    bpp = (os.path.getsize(f"output/compressed/{class_name}/{img_name}/{num_components}.png") * 8) / (compressed_image.shape[0] * compressed_image.shape[1])
+#     # Calculate the number of bits per pixel
+#     bpp = (os.path.getsize(f"output/compressed/{class_name}/{img_name}/{num_components}.png") * 8) / (compressed_image.shape[0] * compressed_image.shape[1])
 
-    return bpp
+#     return bpp
 
 # Load and preprocess the image
 def main(image_path, img_name, num_components, class_name):
@@ -106,6 +111,10 @@ def main(image_path, img_name, num_components, class_name):
     image = image.astype(np.uint8)
     compressed_image = compressed_image.astype(np.uint8)
 
+    total_pixels = image.shape[0] * image.shape[1]
+    num_blocks = np.ceil(image.shape[0] / 16) * np.ceil(image.shape[1] / 16)
+    bpp = ((2*num_components + 1) * num_blocks / total_pixels)*16*8
+
     # saving the compressed image and original image
     os.makedirs(f"output/compressed/{class_name}/{img_name}", exist_ok=True)
     os.makedirs(f"output/original/{class_name}", exist_ok=True)
@@ -113,9 +122,11 @@ def main(image_path, img_name, num_components, class_name):
     io.imsave(f"output/compressed/{class_name}/{img_name}/{num_components}.png", compressed_image)
     io.imsave(f"output/original/{class_name}/{img_name}.png", image)
 
+    return bpp
+
 if __name__ == "__main__":
     imgs_path = "../Microsoft-Database/pca-gray/"
-    num_components = [30, 40, 50, 60, 70, 80, 90]
+    num_components = [1,2,4,8]
     
     buildings = glob.glob(imgs_path + "buildings/*.png")    
 
@@ -125,9 +136,10 @@ if __name__ == "__main__":
         bpp_buildings = []
         rmse_buildings = []
         for num in num_components:
-            main(img_path, img_name, num, "buildings")
-            bpp_buildings.append(bpp(img_path, img_name, num, "buildings"))
+            bpp = main(img_path, img_name, num, "buildings")
+            bpp_buildings.append(bpp)
             rmse_buildings.append(rmse(io.imread(f"output/original/buildings/{img_name}.png"), io.imread(f"output/compressed/buildings/{img_name}/{num}.png")))
+
         plt.plot(bpp_buildings, rmse_buildings, label=f"img{i+1}", marker='o', markersize=30)
     plt.xlabel("BPP", fontsize=40)
     plt.ylabel("RMSE", fontsize=40)

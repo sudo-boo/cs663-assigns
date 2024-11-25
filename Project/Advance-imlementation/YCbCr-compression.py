@@ -50,7 +50,9 @@ def ycbcr2bgr(img):
 
 def calculate_rmse(original, compressed):
     """Compute the Root Mean Squared Error (RMSE) between two images."""
-    return np.sqrt(np.mean((original - compressed) ** 2))
+    sum_sq = np.sum((original.astype("float")) ** 2)
+    forbenius_norm = np.sqrt(sum_sq / float(original.shape[0] * original.shape[1]))
+    return np.sqrt(np.mean((original - compressed) ** 2))/forbenius_norm
 
 
 def calculate_bpp(file_size_bytes, image_shape):
@@ -421,11 +423,11 @@ def decode_jpeg(hf_stream, hf_tree, image_dims, q_table):
     return ret_image
 
 
-def rmse_bpp(original, compressed, path):
-    """Compute the Root Mean Squared Error (RMSE) between two images."""
-    rmse = calculate_rmse(original, compressed)
-    bpp = calculate_bpp(os.path.getsize(path), original.shape)
-    return bpp, rmse
+# def rmse_bpp(original, compressed, path):
+#     """Compute the Root Mean Squared Error (RMSE) between two images."""
+#     rmse = calculate_rmse(original, compressed)
+#     bpp = calculate_bpp(os.path.getsize(path), original.shape)
+#     return bpp, rmse
 
 
 def downsample(img):
@@ -469,7 +471,9 @@ def jpeg_compression(img, q_table, output_dir="output/compressed_imgs"):
     y, cb_down, cr_down = downsample(img_ycbcr)
 
     # Process each quality factor
-    metrics = []
+    # metrics = []
+    bpps = []
+    rmses = []
     for q_factor, q_table in q_table.items():
         print(f"\tCompressing image with quality factor {q_factor}...")
         compressed_channels = []
@@ -500,10 +504,14 @@ def jpeg_compression(img, q_table, output_dir="output/compressed_imgs"):
         cv2.imwrite(path, compressed)
 
         # Calculate metrics
-        bpp, rmse = rmse_bpp(img, compressed, path)
-        metrics.append((bpp, rmse))
+        # bpp, rmse = rmse_bpp(img, compressed, path)
+        bpp = calculate_bpp(len(hf_stream), img.shape)
+        rmse = calculate_rmse(img, compressed)
+        bpps.append(bpp)
+        rmses.append(rmse)
 
-    return metrics
+
+    return bpps, rmses
 
 
 
@@ -536,8 +544,8 @@ def main():
         cv2.imwrite(f"{original_path}/{img_name}.jpg", img)
         path_to_com_img = f"{img_path}/{img_name}"
         os.makedirs(path_to_com_img, exist_ok=True)
-        metrics = jpeg_compression(img, q_tables, path_to_com_img)
-        bpps, rmses = zip(*metrics)
+        bpps,rmses = jpeg_compression(img, q_tables, path_to_com_img)
+        # bpps, rmses = zip(*metrics)
         plt.plot(bpps, rmses, label=img_name, marker="o", markersize=20)
 
     print("Prcoessing completed!")

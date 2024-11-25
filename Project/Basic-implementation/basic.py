@@ -24,7 +24,9 @@ BASE_QTABLE = np.array(
 
 def calculate_rmse(original, compressed):
     """Compute the Root Mean Squared Error (RMSE) between two images."""
-    return np.sqrt(np.mean((original - compressed) ** 2))
+    sum_sq = np.sum((original.astype("float")) ** 2)
+    forbenius_norm = np.sqrt(sum_sq / float(original.shape[0] * original.shape[1]))
+    return np.sqrt(np.mean((original - compressed) ** 2))/forbenius_norm
 
 
 def calculate_bpp(file_size_bytes, image_shape):
@@ -416,7 +418,8 @@ def rmse_bpp(original, q_tables, image_dims, output_dir):
         decoded = decode_jpeg(hf_stream, hf_tree, dims, q_table)
         path = os.path.join(output_dir, f"{q_factor}.jpg")
         mpimg.imsave(path, decoded, cmap="gray")
-        size = os.path.getsize(path)
+        # size = os.path.getsize(path)
+        size = len(hf_stream)
         rmse = calculate_rmse(original, decoded)
         bpp = calculate_bpp(size, image_dims)
 
