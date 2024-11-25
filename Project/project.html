@@ -1,0 +1,121 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<!-- saved from url=(0070)file:///C:/Users/omkar/Desktop/Sem5/cs663-assigns/Project/project.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+	
+	<title></title>
+	<meta name="GENERATOR" content="OpenOffice.org 3.4.1  (Win32)">
+	<meta name="CREATED" content="0;0">
+	<meta name="CHANGED" content="20140911;18434340">
+</head>
+<body lang="en-US" dir="LTR" data-new-gr-c-s-check-loaded="14.1200.0" data-gr-ext-installed="">
+
+<h1>Instructions for the Project</h1>
+<ul>
+
+<li>Projects should be done groupwise - in the same groups as for your homeworks.</li>
+<br>
+<li>All group members should have individual unique contributions to the project (which must be stated clearly in your final report), and yet, be aware of what the other group members did.</li>
+<br>
+<li>Your project work will be a research paper implementation, or your own idea. In any case, if you wish to have some feedback about the triviality or difficulty of your project, please speak to me or Suyash</li>
+<br>
+<li>Your project work may contribute to your thesis, but the work you submit for this course must be done in this semester. It should be a separate deliverable.</li>
+<br>
+<li>Project due date: week after finals. You will required to submit a report and appear for a viva during which you will demo your project, and answer questions about it.
+The final report should clearly but briefly describe the problem statement, a description of the main algorithm(s) you implemented, a description of the datasets on which they were tested, a detailed description of the results followed by a conclusion including an analysis of the good and bad aspects of your implementation or the algorithm.
+</li><br>
+<li>You may use MATLAB/C/C++/Java/Python + any packages (OpenCV,ITK, etc) for your project. But merely invoking calls to someones else's software is not substance enough. You should have your own non-trivial coding component. If software for the research paper you implement is already available, you should use it only for comparison sake - you will be expected to implement the paper on your own. Please discuss with me or Suyash if you need any clarifications for your specific case.
+</li><br>
+</ul>
+
+<h1>Links to Image Datasets</h1>
+<ul>
+	<li><p style="margin-bottom: 0in"><a href="http://www.cvpapers.com/datasets.html">Computer
+	vision datasets online</a> 
+	</p>
+	</li><li><p style="margin-bottom: 0in"><a href="http://www.cs.columbia.edu/CAVE/databases/">Datasets
+	from the CAVE Lab, Columbia University</a> 
+	</p>
+	</li><li><p style="margin-bottom: 0in"><a href="http://www.cs.cmu.edu/~cil/v-images.html">From
+	CMU</a> 
+	</p>
+	</li><li><p style="margin-bottom: 0in"><a href="http://homepages.inf.ed.ac.uk/rbf/CVonline/Imagedbase.htm">CV-online
+	Image databases</a> 
+	</p>
+	</li><li><p style="margin-bottom: 0in"><a href="http://www.iro.umontreal.ca/~mignotte/TestImages.html">Database
+	from Universite de Montreal</a> 
+	</p>
+	</li><li><p style="margin-bottom: 0in"><a href="http://www-cvr.ai.uiuc.edu/ponce_grp/data/">Datasets
+	from UIUC</a> 
+	</p>
+	</li><li><p style="margin-bottom: 0in"><a href="http://research.microsoft.com/en-us/projects/objectclassrecognition/">Object
+	recognition datasets from Microsoft Research</a> 
+	</p>
+	</li><li><p style="margin-bottom: 0in"><a href="http://www.vision.caltech.edu/Image_Datasets/Caltech101/">Object
+	Recognition/detection dataset</a> 
+	</p>
+	</li><li><p style="margin-bottom: 0in"><a href="http://www.cs.utexas.edu/~grauman/courses/spring2008/datasets.htm">Object
+	recognition/detection datsets</a> 
+	</p>
+	</li><li><p><a href="http://www.ee.columbia.edu/ln/dvmm/downloads/authsplcuncmp/">Image
+	splicing dataset</a> 
+	</p>
+</li></ul>
+<h1>Project Topic</h1>
+This year, each group will build an image compression engine, along the lines of the JPEG algorithm that will be taught in class very soon. The slides for
+image compression are available <a href="https://docs.google.com/presentation/d/1-8xCg7o8Vtc9ghJf6y1Nkq9-TV0qSNfX/edit?usp=sharing&amp;ouid=113281828352677469792&amp;rtpof=true&amp;sd=true">here</a> -- you can start reading them on your own. There are 15 marks for the project, out of which 8 marks will be awarded for a basic implementation
+of the algorithm on grayscale images -- correctness and decent numerical results via the RMSE versus BPP curve. The expectation from the implementation are:
+
+<ul>
+<li>Computation of the 2D DCT coefficients of non-overlapping image patches (there exist implementations for this which you can use)</li>
+<li>Implementation of the quantization step</li>
+<li>Implementation of the Huffman tree (you can use an existing implementation or code on your own for more flexibility)</li>
+<li>Writing the data to a file with a specific format you can decide on. Your program should be able to read the file and display the compressed image on the screen accurately.</li>
+<li>You should simulate different quality factors and plots a graph of RMSE versus BPP for at least 20 different images. The RMSE stands for the relative root mean squared error between the original image and its compressed version. The BPP stands for the size of the image in bits divided by the number of pixels.</li>
+</ul>
+
+
+The remaining 7 marks will be awarded for some innovations on your part which include but are not 
+limited to the following:
+<ul>
+<li>An extensive comparison to an existing implementation of JPEG (either MATLAB or GIMP) in terms of experiments on different types of quantization matrices, Huffman table settings, or other parameter settings</li>
+<li>Extensive experiments on color images apart from grayscale images</li>
+<li>Implementation of a research paper from the list below</li>
+<li>Thorough understanding of a research paper from the list below</li>
+<li>Extensive comparison of your implementation to a PCA-based image compression technique on a class of images (eg: face images, vehicle images, etc.)
+</li></ul>
+
+
+<h1> List of Research Papers on Image Compression</h1>
+
+<ol>
+<li>Using partial differential equations (PDEs) for image compression: M. Mainberger and J.Weickert, "Edge-Based Image Compression with Homogeneous Diffusion", CAIP 2009</li>
+<li>C. Schmaltz, J. Weickert and A. Bruhn, "Beating the Quality of JPEG 2000 with Anisotropic Diffusion", DAGM 2009.</li>
+<li>Osman Gokhan Sezer, Onur G. Guleryuz and Yucel Altunbasak, "Approximation and Compression With Sparse Orthonormal Transforms", IEEE Transactions on Image Processing, 2015</li>
+<li>Haoming Chen and Bing Zeng, "New Transforms Tightly Bounded by DCT and KLT", IEEE Signal Processing Letters, 2012</li>
+<li>A. K. Jain, "A sinusoidal family of unitary transforms", IEEE Trans. Patt. Anal. Mach. Intell., vol. 1, no. 4, pp. 356–365, Oct. 1979.</li>
+<li>IEEE SIGNAL PROCESSING LETTERS, VOL. 16, NO. 10, OCTOBER 2009, "R-D Performance Upper Bound of Transform Coding for 2-D Directional Sources", 
+Shuyuan Zhu, Siu-Kei Au Yeung and Bing Zeng</li>
+</ol>
+
+
+<grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+      div.grammarly-desktop-integration {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select:none;
+        user-select:none;
+      }
+
+      div.grammarly-desktop-integration:before {
+        content: attr(data-content);
+      }
+    </style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></body></html>
