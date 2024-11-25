@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import io, color
-from sklearn.decomposition import PCA
 import os
 import glob
+from datetime import datetime as time
 
 # applying PCA on the block of the image
 def compress_block_pca(block, num_components):
@@ -78,8 +78,6 @@ def compress_image_pca(image, num_components, block_size=16):
             # Step 3: Reconstruct the block
             compressed_image[i:i+block_size, j:j+block_size] = block_compressed
 
-
-
     return compressed_image
 
 #calculating rmse between two images
@@ -87,17 +85,6 @@ def rmse(imageA, imageB):
     sum_sq = np.sum((imageA.astype("float")) ** 2)
     forbenius_norm = np.sqrt(sum_sq / float(imageA.shape[0] * imageA.shape[1]))
     return np.sqrt(np.mean((imageA - imageB) ** 2))/forbenius_norm
-
-
-# calculating bpp for the compressed image
-# def bpp(image_path, img_name, num_components, class_name):
-#     compressed_image = io.imread(f"output/compressed/{class_name}/{img_name}/{num_components}.png")
-#     compressed_image = compressed_image.astype(float)
-
-#     # Calculate the number of bits per pixel
-#     bpp = (os.path.getsize(f"output/compressed/{class_name}/{img_name}/{num_components}.png") * 8) / (compressed_image.shape[0] * compressed_image.shape[1])
-
-#     return bpp
 
 # Load and preprocess the image
 def main(image_path, img_name, num_components, class_name):
@@ -126,23 +113,33 @@ def main(image_path, img_name, num_components, class_name):
 
 if __name__ == "__main__":
     imgs_path = "../Microsoft-Database/pca-gray/"
-    num_components = [1,2,4,8]
+    num_components = [1, 2, 4, 6, 8]
     
     buildings = glob.glob(imgs_path + "buildings/*.png")    
 
-    plt.figure(figsize=(25,25))
+    plt.figure(figsize=(35,25))
     for i, img_path in enumerate(buildings):
+        print(f"Processing image {i+1}...")
         img_name = f"img{i+1}"
         bpp_buildings = []
         rmse_buildings = []
         for num in num_components:
+            start = time.now()
             bpp = main(img_path, img_name, num, "buildings")
             bpp_buildings.append(bpp)
             rmse_buildings.append(rmse(io.imread(f"output/original/buildings/{img_name}.png"), io.imread(f"output/compressed/buildings/{img_name}/{num}.png")))
+            end = time.now()
+            time_taken = ((end - start).total_seconds() * 1000).__round__(2)
+            print(f"\tProcessed for number of components: {num}\t\t\t{time_taken} ms")
 
-        plt.plot(bpp_buildings, rmse_buildings, label=f"img{i+1}", marker='o', markersize=30)
-    plt.xlabel("BPP", fontsize=40)
-    plt.ylabel("RMSE", fontsize=40)
-    plt.legend(fontsize=35)
+        plt.plot(bpp_buildings, rmse_buildings, label=f"img{i+1}", marker='o', markersize=20)
+
+    plt.title("BPP vs RMSE for Localised PCA Method", fontsize=30)
+    plt.xlabel("BPP", fontsize=25)
+    plt.ylabel("RMSE", fontsize=25)
+    plt.legend(fontsize=20)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
     plt.grid()
     plt.savefig("output/plot.png")
+    print("Processing Completed!")
