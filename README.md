@@ -11,4 +11,4 @@
 | HW3      | 08 Oct, 10:00 AM (hard)| 
 | HW4      | 23 Oct, 10:00 AM (hard)| 
 | HW5      | 08 Nov, 10:00 AM (hard)| 
-| Project  | 23 Nov (most probably) |
+| Project  | 25 Nov, 07:00 AM (hard)|
